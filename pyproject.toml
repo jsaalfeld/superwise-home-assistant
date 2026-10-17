@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superwise-prototype"
+version = "0.1.0"
+description = "Experimental read-only Superwise diagnostics for a future Home Assistant integration"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+superwise-probe = "superwise.cli:run"
+
+[tool.setuptools.packages.find]
+include = ["superwise*"]

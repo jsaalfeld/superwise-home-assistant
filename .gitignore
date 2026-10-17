@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.local/
+artifacts/
+__pycache__/
+*.pyc
+
+# Personal development instructions
+AGENTS.md
+AGENTS.override.md
