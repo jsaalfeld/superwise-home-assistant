@@ -6,7 +6,8 @@ All runtime files reside under `custom_components/superwise/` so HACS/manual
 installation does not depend on the diagnostic package at repository root.
 
 - `api.py`: asynchronous HTTP and SockJS/STOMP using an isolated cookie session.
-  Same-origin redirects only; no implicit authentication or command retries.
+  Same-origin redirects only; a same-host HTTP login redirect is upgraded locally
+  to HTTPS before any request. No implicit authentication or command retries.
 - `config_flow.py`: setup, explicit reauthentication and options. Duplicate
   controllers and duplicate sessions for an account are rejected before login.
 - `coordinator.py`: shared live state, periodic metadata, stale-state checking,

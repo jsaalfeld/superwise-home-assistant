@@ -118,3 +118,15 @@ labeling this interval as firing duration. An ongoing record may have
 New logins may invalidate existing sessions for the same account. Independent
 sessions for different accounts sharing a controller have not been validated.
 The client requires explicit login and stops when its session is lost.
+
+## Login redirect transport
+
+A successful HTTPS form login may return an absolute HTTP redirect to the same
+host, followed by another redirect to the dashboard. The asynchronous client
+upgrades same-host/default-HTTP-port targets locally to HTTPS without making an
+HTTP request. Host, effective port and user-info restrictions remain enforced.
+A 302 changes the redirected request to GET and drops the submitted login body.
+
+The installed HA integration has been verified for live readout, device program
+readback, firing-list responses and option reload with the stored cookie session.
+These checks execute no firing-control commands.

@@ -5,8 +5,10 @@ program selection, execution controls, program-segment editing and firing-histor
 actions. Uses the same undocumented cloud interfaces as the SuperWise website.
 
 **Experimental release:** tested with Home Assistant 2026.10.2 and synthetic cloud
-responses. The underlying commands have been verified with a TC75 controller;
-the installed integration still needs a first end-to-end hardware validation.
+responses. Setup, live readout, read-only actions and option reload with a saved
+session have also been verified on a TC75 controller. Execution controls were
+verified separately at protocol level; validate them in the installed integration
+under supervision before production use.
 
 ## Installation
 
