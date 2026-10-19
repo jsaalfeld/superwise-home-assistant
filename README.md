@@ -1,85 +1,157 @@
-# Superwise Home Assistant
+# Superwise for Home Assistant
 
-Experimental Python client for bentrup SuperWise. The project provides read-only
-cloud diagnostics for development of a Home Assistant integration. It is not yet
-an installable HACS integration.
+Custom integration for bentrup SuperWise kiln controllers. Provides live readout,
+program selection, execution controls, program-segment editing and firing-history
+actions. Uses the same undocumented cloud interfaces as the SuperWise website.
 
-## Features
+**Experimental release:** tested with Home Assistant 2026.10.2 and synthetic cloud
+responses. The underlying commands have been verified with a TC75 controller;
+the installed integration still needs a first end-to-end hardware validation.
 
-- Controller status, temperature, setpoint and heating output.
-- Program numbers, names and raw segment definitions.
-- Firing records and historical sensor curves.
-- Live updates via STOMP over SockJS using the HTTP polling transport.
-- Optional estimated electrical power based on configured kiln rated power.
+## Installation
 
-Program editing, program selection and firing controls are not exposed by the
-client. Program selection has been investigated separately; see the
-[protocol notes](docs/findings.md).
+Requires Home Assistant 2026.10 or newer.
 
-## Requirements
+### Manual installation
 
-Python 3.10 or newer. The runtime uses only the Python standard library.
+1. Copy `custom_components/superwise` into `/config/custom_components/superwise`.
+   The final path must be `/config/custom_components/superwise/manifest.json`.
+2. Restart Home Assistant.
+3. Open **Settings → Devices & services → Add integration → Superwise**.
+4. Enter the server URL, credentials, six-digit controller serial and optional
+   rated power in kW. Use 0 to disable the power estimate.
 
-## Configuration
+A distribution ZIP contains the `custom_components/superwise/` directory and can
+be extracted into the Home Assistant configuration directory. Do not copy `.env`,
+`.local`, captured data or the standalone diagnostic client into Home Assistant.
 
-Copy `.env.example` to `.env` and configure the controller and account:
+### HACS custom repository
 
-| Variable | Purpose |
+Once this version is available on the repository's default branch, add
+`https://github.com/jsaalfeld/superwise-home-assistant` as a HACS custom repository
+of type **Integration**, download **Superwise**, restart HA and follow the setup
+steps above. This is not a claim of inclusion in the default HACS catalog.
+
+## Account sessions
+
+Creating a session may invalidate another login for the same account. Setup and
+explicit reauthentication create a session. HA restarts, reconnects and option
+changes reuse the stored session; they never silently log in. If a browser or
+another client replaces that session, HA requests reauthentication and stops
+using it until the request is completed.
+
+One configuration per account is allowed to avoid competing sessions inside HA.
+Independent access using separate accounts for the same kiln is not yet verified.
+Credentials and session cookies are stored in HA's private config-entry storage;
+include that storage in your normal secret and backup handling.
+
+## Entities and options
+
+The integration creates a device with:
+
+- Kiln temperature, setpoint, heating-output percentage and controller temperature.
+- Estimated electrical power when rated power is configured.
+- Process status, program name, segment and segment remaining time.
+- Last contact, latest record start and last completed recording duration.
+- Connection and program-active binary sensors.
+- Program selection plus Start, Stop, Pause and Continue buttons.
+
+In **Configure**, set rated power and enable remote control if desired. Remote
+control is disabled initially; readout and history work without it. Stop remains
+available independently of this option. No command is executed during setup,
+reload or reconnect. Program selection does not start a firing.
+
+**Pause is not an off command:** the controller may keep heating while paused.
+Stop waits for a fresh idle/stopped state, zero setpoint and zero reported digital
+outputs. This is controller feedback, not independent current measurement, and
+does not disconnect the mains supply. An uncertain command result is reported
+without automatically repeating the command.
+
+Values become unavailable when the controller timestamp is at least 60 seconds
+old. Live STOMP updates are combined with periodic HTTP checks and metadata
+refreshes. Missing heating output is not treated as zero.
+
+## Program and history actions
+
+Under **Developer tools → Actions**, use the following response actions. Select
+the integration entry in each action. Scripts must set a `response_variable`.
+
+| Action | Purpose |
 | --- | --- |
-| `SUPERWISE_URL` | Server origin; default `https://www.superwise.eu` |
-| `SUPERWISE_USERNAME` | Account username |
-| `SUPERWISE_PASSWORD` | Account password |
-| `SUPERWISE_SERIAL_NUMBER` | Required six-digit controller serial number |
-| `SUPERWISE_RATED_POWER_KW` | Optional kiln nameplate power in kW; leave blank to disable estimation |
+| `superwise.read_program` | Request a program directly from the controller |
+| `superwise.update_program` | Change a segment temperature and/or dwell time and verify device readback |
+| `superwise.list_firings` | Return available firing IDs, program numbers and record timestamps |
+| `superwise.get_firing_history` | Return one record and its four sensor curves |
 
-Environment variables override `.env`. `--serial` overrides the controller for
-one invocation. Rated power accepts a decimal point or comma and must be finite
-and positive. Settings are validated before connecting. Credentials, sessions
-and captured data are excluded from version control.
+Program editing requires remote control enabled and a fresh idle controller with
+outputs and setpoint off. Segment numbers start at 1. Temperature is a whole
+number in °C. Dwell editing accepts whole minutes for minute-resolution programs;
+HOLD and ramp editing are not supported. Controller limits are checked before
+submitting. The response includes `previous_program` and the verified new program.
+A write or readback failure is not automatically retried or rolled back: inspect
+the controller state before another write. Program edits never start a firing.
 
-## Usage
+Example script action with synthetic values:
 
-A new login may invalidate another session for the same account. The client
-reuses saved sessions and does not automatically log in after session loss.
-
-```bash
-# Explicit login and a bounded live capture:
-python3 -m superwise --login --listen 20
-
-# Reuse the saved session and fetch historical curves:
-python3 -m superwise --history
-
-# Local tests without network access:
-python3 -m unittest discover -v
+```yaml
+action: superwise.update_program
+data:
+  config_entry_id: REPLACE_WITH_ENTRY_ID
+  program: 1
+  segment: 1
+  temperature: 200
+response_variable: program_result
 ```
 
-`python3 probe.py` remains an alternative entry point. Run either entry point
-with `--help` for options. No background service is installed.
+Historical curves are returned as action responses, not stored in entity
+attributes or the state recorder. The firing list may be incomplete. Record
+start/end semantics can include recording beyond program completion; recording
+duration is deliberately not labelled as exact heating or firing duration.
 
-The default output is `artifacts/snapshot.json`. Live updates are written to
-`artifacts/snapshot.live.jsonl`. `--history` fetches curves for the first listed
-firing with a complete time range; an ongoing firing has no end timestamp.
-Captured files and the cookie jar under `.local/` are local data.
+## Power and energy
 
-## Power estimation
-
-`controller.estimated_power_kw` is calculated as
-`rated_power_kw × lpValue / 100`. This assumes the reported percentage represents
-average heating duty. It is an estimate rather than a measured electrical power
-value. Missing, invalid or stale inputs produce `null`; a valid zero remains zero.
-Energy integration in kWh is not implemented.
+Estimated power is `rated_power_kw × heating_output / 100`. This assumes the
+percentage represents average heater duty and is **not measured electrical
+power**. The estimate is unavailable when its inputs are invalid, missing or
+stale. No energy counter is included; an energy estimate needs time integration
+and explicit treatment of missing intervals.
 
 ## Limitations
 
-The client uses undocumented web application interfaces. HTML and protocol
-changes may break compatibility. Historical result completeness, ramp encoding,
-firing-end semantics and independent access from multiple accounts remain
-unverified. The current transport is synchronous and must not run directly in
-the Home Assistant event loop.
+- Unofficial web interfaces can change without notice.
+- Hardware behavior was explored with TC75; other controllers are unverified.
+- Delayed start, alarm management, ramp editing and complete website/account
+  administration are not implemented.
+- No public-cloud hardware tests are run automatically in CI.
 
-- [Architecture](docs/architecture.md)
-- [Protocol notes](docs/findings.md)
-- [Validation procedure](docs/test-plan.md)
+See [protocol notes](docs/findings.md), [architecture](docs/architecture.md) and
+[validation procedure](docs/test-plan.md).
+
+## Development
+
+The standalone diagnostic CLI remains available as `python3 -m superwise`.
+Only that CLI reads `.env`; the HA integration uses its setup/options dialogs.
+The `.env.example` template documents the diagnostic settings. Explicit CLI login
+may displace an existing account session, just like integration setup.
+
+```bash
+# Standard-library diagnostic tests:
+python3 -m unittest discover -v
+
+# Rootless isolated HA tests (the run has no network):
+podman build -f Containerfile.test -t superwise-ha-test .
+podman run --rm --network none \
+  -v "$PWD/custom_components:/work/custom_components:ro,Z" \
+  -v "$PWD/tests_ha:/work/tests_ha:ro,Z" \
+  -v "$PWD/tests:/work/tests:ro,Z" \
+  -v "$PWD/superwise:/work/superwise:ro,Z" \
+  -v "$PWD/probe.py:/work/probe.py:ro,Z" \
+  -v "$PWD/pytest.ini:/work/pytest.ini:ro,Z" \
+  superwise-ha-test
+```
+
+Tests use synthetic data. Local credentials, sessions, hardware captures and
+personal development instructions are excluded from version control.
 
 ## License
 

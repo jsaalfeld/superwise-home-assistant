@@ -1,0 +1,5 @@
+FROM docker.io/library/python:3.14-slim
+WORKDIR /work
+COPY requirements_test.txt /tmp/requirements_test.txt
+RUN pip install --no-cache-dir -r /tmp/requirements_test.txt
+CMD ["python", "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider"]

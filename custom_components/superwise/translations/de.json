@@ -1,0 +1,119 @@
+{
+  "title": "Superwise",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Superwise",
+        "description": "Die Anmeldung kann eine vorhandene Sitzung desselben Benutzers abmelden. Die Integration meldet sich bei Sitzungsverlust nicht automatisch erneut an.",
+        "data": {
+          "url": "Server-URL",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "serial_number": "Regler-Seriennummer",
+          "rated_power_kw": "Nennleistung in kW (0 deaktiviert die Schätzung)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneut bei Superwise anmelden",
+        "description": "Die Sitzung ist abgelaufen oder wurde ersetzt. Mit dem Absenden wird eine neue Sitzung erstellt; andere Sitzungen können abgemeldet werden.",
+        "data": {
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Anmeldung fehlgeschlagen.",
+      "cannot_connect": "Superwise ist nicht erreichbar oder die Antwort wird nicht unterstützt.",
+      "invalid_url": "Eine HTTPS-Serveradresse ohne Pfad angeben.",
+      "invalid_serial": "Die Seriennummer muss sechsstellig sein.",
+      "invalid_power": "Eine gültige nichtnegative Nennleistung angeben."
+    },
+    "abort": {
+      "already_configured": "Dieser Regler ist bereits eingerichtet.",
+      "account_already_configured": "Dieses Konto ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Anmeldung erfolgreich."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Superwise-Einstellungen",
+        "description": "Fernbedienung erlaubt Programmwahl, Start, Pause/Fortsetzen und Programmänderungen. Stop ist auch bei deaktivierter Fernbedienung verfügbar. Pause schaltet die Heizung nicht aus.",
+        "data": {
+          "rated_power_kw": "Nennleistung in kW (0 deaktiviert die Schätzung)",
+          "enable_control": "Fernbedienung aktivieren"
+        }
+      }
+    },
+    "error": {
+      "invalid_power": "Eine gültige nichtnegative Nennleistung angeben."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "setpoint": {
+        "name": "Solltemperatur"
+      },
+      "heating_output": {
+        "name": "Heizleistung"
+      },
+      "estimated_power": {
+        "name": "Geschätzte Leistung"
+      },
+      "controller_temperature": {
+        "name": "Reglertemperatur"
+      },
+      "process_status": {
+        "name": "Prozessstatus"
+      },
+      "program_name": {
+        "name": "Programmname"
+      },
+      "segment": {
+        "name": "Segment"
+      },
+      "segment_remaining": {
+        "name": "Segment-Restzeit"
+      },
+      "last_contact": {
+        "name": "Letzter Kontakt"
+      },
+      "record_start": {
+        "name": "Beginn der letzten Aufzeichnung"
+      },
+      "last_record_duration": {
+        "name": "Dauer der letzten abgeschlossenen Aufzeichnung"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Starten"
+      },
+      "stop": {
+        "name": "Stoppen"
+      },
+      "pause": {
+        "name": "Pausieren"
+      },
+      "continue": {
+        "name": "Fortsetzen"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Programmwahl"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "Verbindung"
+      },
+      "active": {
+        "name": "Programm aktiv"
+      }
+    }
+  }
+}

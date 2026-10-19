@@ -1,0 +1,119 @@
+{
+  "title": "Superwise",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Superwise",
+        "description": "Signing in may displace another session for the same account. The integration never automatically signs in after session loss.",
+        "data": {
+          "url": "Server URL",
+          "username": "Username",
+          "password": "Password",
+          "serial_number": "Controller serial number",
+          "rated_power_kw": "Rated power in kW (0 disables estimation)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Superwise again",
+        "description": "The session expired or was replaced. Submitting creates a new session and may displace other sessions.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Authentication failed.",
+      "cannot_connect": "Cannot connect or unsupported server response.",
+      "invalid_url": "Enter an HTTPS server origin without a path.",
+      "invalid_serial": "The controller serial must contain six digits.",
+      "invalid_power": "Enter a finite nonnegative rated power."
+    },
+    "abort": {
+      "already_configured": "This controller is already configured.",
+      "account_already_configured": "This account is already configured.",
+      "reauth_successful": "Reauthentication successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Superwise options",
+        "description": "Remote control enables selection, start, pause/resume and program editing. Stop remains available with remote control disabled. Pause does not turn heating off.",
+        "data": {
+          "rated_power_kw": "Rated power in kW (0 disables estimation)",
+          "enable_control": "Enable remote control"
+        }
+      }
+    },
+    "error": {
+      "invalid_power": "Enter a finite nonnegative rated power."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "setpoint": {
+        "name": "Setpoint"
+      },
+      "heating_output": {
+        "name": "Heating output"
+      },
+      "estimated_power": {
+        "name": "Estimated power"
+      },
+      "controller_temperature": {
+        "name": "Controller temperature"
+      },
+      "process_status": {
+        "name": "Process status"
+      },
+      "program_name": {
+        "name": "Program name"
+      },
+      "segment": {
+        "name": "Segment"
+      },
+      "segment_remaining": {
+        "name": "Segment remaining time"
+      },
+      "last_contact": {
+        "name": "Last contact"
+      },
+      "record_start": {
+        "name": "Latest record start"
+      },
+      "last_record_duration": {
+        "name": "Last completed record duration"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start"
+      },
+      "stop": {
+        "name": "Stop"
+      },
+      "pause": {
+        "name": "Pause"
+      },
+      "continue": {
+        "name": "Continue"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Program selection"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "Connection"
+      },
+      "active": {
+        "name": "Program active"
+      }
+    }
+  }
+}

@@ -38,3 +38,16 @@ numbers and timestamps. Keep credentials, coupling secrets, personal device
 identifiers and raw account responses out of shared reports and fixtures.
 Private captures belong under the ignored `artifacts/` directory; published
 fixtures must use synthetic data.
+
+## Integration verification
+
+The `tests_ha/` suite runs against Home Assistant in a rootless Podman container
+with networking disabled. It verifies setup, duplicate rejection, stored-session
+reuse, explicit reauthentication, options, entity registration/unload, stale
+availability, command gating, single-send behavior, program readback comparisons
+and response actions. No actual kiln commands are sent by automated tests.
+
+Before production use, install the custom integration and validate readout first,
+then enable remote control for a supervised control test. Protocol-level hardware
+tests do not replace testing the complete installed HA integration. Verify unload,
+restart and replacement of the session from the website without automatic login.

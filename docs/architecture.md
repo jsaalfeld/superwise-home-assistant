@@ -1,47 +1,50 @@
 # Architecture
 
-The project separates settings, data normalization and cloud communication from
-the command line interface. It currently provides a synchronous diagnostic client.
+## Home Assistant custom integration
 
-```text
-superwise/
-  settings.py     Environment configuration and validation
-  models.py       Embedded JSON parsing and measurement normalization
-  client.py       Cookie session, read-only HTTP access and SockJS/STOMP
-  cli.py          Diagnostic command line interface
-  __main__.py     Module entry point
-probe.py          Compatibility entry point
-tests/           Offline tests using synthetic data
-```
+All runtime files reside under `custom_components/superwise/` so HACS/manual
+installation does not depend on the diagnostic package at repository root.
 
-`Settings` holds account credentials, controller identity and optional rated
-power. Credentials are omitted from its representation. Configuration is loaded
-from `.env`, with process environment variables taking precedence. The CLI
-requires a controller serial number before connecting.
+- `api.py`: asynchronous HTTP and SockJS/STOMP using an isolated cookie session.
+  Same-origin redirects only; no implicit authentication or command retries.
+- `config_flow.py`: setup, explicit reauthentication and options. Duplicate
+  controllers and duplicate sessions for an account are rejected before login.
+- `coordinator.py`: shared live state, periodic metadata, stale-state checking,
+  reconnect backoff, serialized control operations and resource cleanup.
+- `models.py`: JSON parsing, sanitized controller fields and numeric handling.
+- Entity platforms: sensor, binary sensor, select and button.
+- `services.py`: response actions for program readback/segment editing and history.
+- `translations/`: English and German setup, options and entity names.
 
-`Client` reuses a cookie session. Authentication is explicit, and session loss
-never triggers an automatic login loop. HTTP POST is used for authentication and
-SockJS connection messages; the client exposes no kiln-control operations.
+The integration never imports the repository-level diagnostic client. It does
+not read `.env`, reuse browser cookies or depend on any local hardware captures.
+HA stores account credentials and session cookies in private config-entry storage.
+Session loss initiates a reauthentication request without starting a login loop.
 
-`models.py` parses embedded page JSON without executing JavaScript. Controller
-exports use an allowlist to exclude account fields and coupling secrets. Invalid
-numeric values become `null`. Freshness is derived from the controller timestamp;
-data at least 60 seconds old is considered stale.
+Push updates use the observed SockJS XHR transport. Timestamp-based availability
+is checked separately so continuous messages with stale device timestamps do not
+keep measurements available. Periodic HTTP metadata refresh is scheduled even
+while live messages continue. Reconnects do not issue control commands.
 
-Optional power estimation uses rated power and a fresh heating-output percentage
-in the range 0–100. Neither percent output nor the estimate is an electrical meter.
+Remote control is opt-in. Stop and read-only actions are independent of that
+option. Every control operation is serialized, sent once and confirmed with new
+controller feedback. Program writes use a fresh device definition and are
+confirmed through a newly requested message on the program topic. Ramp encoding
+is retained but not editable through the service.
 
-## Home Assistant integration boundary
+## Diagnostic package
 
-The client is not a Home Assistant integration. A future adapter needs asynchronous
-communication, shared state updates, entity availability and explicit handling of
-session expiry. Large historical curves should be kept outside entity attributes
-and the state recorder. Estimated power must remain distinguishable from measured
-power. Energy calculations need defined behavior for missing intervals.
+`superwise/` remains a standard-library research CLI with validated `.env`
+settings, cookie-session reuse, bounded live capture and private artifact output.
+Its synchronous transport is separate from HA's asynchronous client. Both use
+allowlisted controller data and distinguish estimated from measured power.
 
-## Local data
+## Data boundaries
 
-`.env`, `.local/` and `artifacts/` are excluded from Git. Raw server responses can
-contain account data and coupling secrets and must not be published as fixtures.
-Automated tests use synthetic data. Personal development instructions belong in
-local, ignored files rather than public project documentation.
+Raw cloud responses can include account data and coupling secrets. Neither
+runtime client logs or exports raw controller objects. Tests use synthetic
+identifiers and programs; real captures remain in ignored `artifacts/`.
+Historical curves are action responses rather than large recorder attributes.
+Program-original backups returned by editing actions should be retained before
+subsequent edits. No automatic program rollback is attempted after an ambiguous
+write result because that could overwrite an external change.

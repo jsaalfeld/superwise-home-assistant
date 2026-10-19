@@ -1,0 +1,79 @@
+read_program:
+  name: Read program
+  description: Request a fresh program definition from the controller. Returns its raw segment definition.
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: superwise
+    program:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
+update_program:
+  name: Update program segment
+  description: Change a segment target or dwell time, then verify a fresh device readback. Requires remote control enabled. Does not start a firing. Keep the returned previous_program as a backup.
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: superwise
+    program:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
+    segment:
+      required: true
+      description: Segment number, starting at 1.
+      selector:
+        number:
+          min: 1
+          mode: box
+    temperature:
+      description: Optional target temperature in degrees Celsius, within controller limits.
+      selector:
+        number:
+          min: 0
+          max: 2000
+          unit_of_measurement: °C
+          mode: box
+    dwell_minutes:
+      description: Optional dwell time. Only minute-resolution programs are supported; HOLD is not accepted.
+      selector:
+        number:
+          min: 0
+          max: 10000
+          unit_of_measurement: min
+          mode: box
+get_firing_history:
+  name: Get firing history
+  description: Return a firing record and its temperature, setpoint, heating-output and controller-temperature curves. No curve data is stored as entity attributes.
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: superwise
+    firing_id:
+      required: true
+      description: Identifier from the firing records. Use integration records to identify the required firing.
+      selector:
+        text:
+
+list_firings:
+  name: List firings
+  description: Return firing IDs, program numbers, record timestamps and recording state for this controller. This may be a limited list, not the complete account history.
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: superwise
