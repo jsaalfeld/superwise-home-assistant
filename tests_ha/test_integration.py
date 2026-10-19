@@ -25,14 +25,23 @@ DATA = {
 
 
 async def test_user_flow_creates_session_once(hass, mock_api):
-    with patch(
-        "custom_components.superwise.config_flow.SuperwiseApi", return_value=mock_api
+    with (
+        patch(
+            "custom_components.superwise.config_flow.SuperwiseApi",
+            return_value=mock_api,
+        ),
+        patch(
+            "custom_components.superwise.async_setup_entry", return_value=True
+        ) as setup_entry,
     ):
         result = await hass.config_entries.flow.async_init(
             "superwise",
             context={"source": SOURCE_USER},
             data={k: v for k, v in DATA.items() if k != "session_cookies"},
         )
+        # Flow completion schedules entry setup in the background.
+        await hass.async_block_till_done()
+    setup_entry.assert_awaited_once()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["session_cookies"]
     mock_api.login.assert_awaited_once_with("test-account", "synthetic")
