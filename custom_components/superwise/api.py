@@ -120,9 +120,28 @@ class SuperwiseApi:
                         if response.status in (401, 403):
                             raise AuthenticationError("Session unavailable")
                         if response.status in (301, 302, 303, 307, 308):
-                            target = urljoin(url, response.headers.get("Location", ""))
-                            if URL(target).origin() != URL(self.base).origin():
+                            target_url = URL(
+                                urljoin(url, response.headers.get("Location", ""))
+                            )
+                            origin = URL(self.base).origin()
+                            # The cloud emits an absolute http:// redirect after login.
+                            # Upgrade it locally; never send cookies or credentials over HTTP.
+                            if (
+                                target_url.scheme == "http"
+                                and target_url.host == origin.host
+                                and target_url.port == 80
+                            ):
+                                target_url = target_url.with_scheme("https").with_port(
+                                    None if origin.port == 443 else origin.port
+                                )
+                            if (
+                                target_url.user
+                                or target_url.password
+                                or (target_url.scheme, target_url.host, target_url.port)
+                                != (origin.scheme, origin.host, origin.port)
+                            ):
                                 raise SuperwiseError("Cross-origin redirect refused")
+                            target = str(target_url)
                             if urlsplit(target).path == "/login" and not login:
                                 raise AuthenticationError("Session expired or replaced")
                             if response.status in (301, 302, 303):

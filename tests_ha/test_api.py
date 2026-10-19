@@ -241,3 +241,47 @@ async def test_offline_stop_is_attempted_once(api, snapshot):
     api.request.assert_awaited_once_with(
         "/controller/100001/stop", method="GET", data=None
     )
+
+
+async def test_login_http_redirect_is_upgraded_without_credentials(api):
+    first = response_context(302, "http://www.superwise.eu/dashboard")
+    response = MagicMock()
+    response.status = 200
+    response.url = "https://www.superwise.eu/dashboard"
+    response.text = AsyncMock(return_value="Dashboard")
+    second = MagicMock()
+    second.__aenter__ = AsyncMock(return_value=response)
+    second.__aexit__ = AsyncMock(return_value=False)
+    with patch.object(api.session, "request", side_effect=[first, second]) as request:
+        assert (
+            await api.request(
+                "/login", method="POST", data={"password": "synthetic"}, login=True
+            )
+            == "Dashboard"
+        )
+    calls = request.call_args_list
+    assert calls[1].args[0] == "GET"
+    assert calls[1].args[1] == "https://www.superwise.eu/dashboard"
+    assert calls[1].kwargs["data"] is None
+    assert all(call.args[1].startswith("https://") for call in calls)
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://www.superwise.eu:8080/dashboard",
+        "https://synthetic@www.superwise.eu/dashboard",
+        "http://other.invalid/dashboard",
+    ],
+)
+async def test_redirect_cannot_change_host_port_or_userinfo(api, target):
+    with (
+        patch.object(
+            api.session, "request", return_value=response_context(302, target)
+        ) as request,
+        pytest.raises(SuperwiseError, match="Cross-origin"),
+    ):
+        await api.request(
+            "/login", method="POST", data={"password": "synthetic"}, login=True
+        )
+    assert request.call_count == 1
