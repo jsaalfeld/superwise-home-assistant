@@ -152,8 +152,8 @@ podman run --rm --network none \
   superwise-ha-test
 ```
 
-Tests use synthetic data. Local credentials, sessions, hardware captures and
-personal development instructions are excluded from version control.
+Tests use synthetic data. Credentials, sessions and hardware captures are
+excluded from version control.
 
 ## License
 
