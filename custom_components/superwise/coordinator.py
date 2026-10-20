@@ -46,7 +46,7 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
             state = await self.api.state()
             if self.data:
                 state = {**self.data, **state}
-            if time.monotonic() - self._metadata_at >= 120:
+            if not self.data or time.monotonic() - self._metadata_at >= 120:
                 state["programs"] = await self.api.programs()
                 state["firings"] = await self.api.firings()
                 self._metadata_at = time.monotonic()

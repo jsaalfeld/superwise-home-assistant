@@ -1,5 +1,6 @@
 """Exercise actual Home Assistant config flows, entities and unload."""
 
+import time
 from copy import deepcopy
 from unittest.mock import AsyncMock, patch
 
@@ -77,9 +78,14 @@ async def setup(hass, api, options=None):
     return entry
 
 
-async def test_setup_entities_and_unload_reuse_session(hass, mock_api):
-    entry = await setup(hass, mock_api)
+@pytest.mark.parametrize("uptime", [30, 1000])
+async def test_setup_entities_and_unload_reuse_session(hass, mock_api, uptime):
+    with patch("custom_components.superwise.coordinator.time", wraps=time) as clock:
+        clock.monotonic.return_value = uptime
+        entry = await setup(hass, mock_api)
     mock_api.login.assert_not_called()
+    mock_api.programs.assert_awaited_once()
+    mock_api.firings.assert_awaited_once()
     states = hass.states.async_all()
     assert any(s.state == "21.5" and s.domain == "sensor" for s in states)
     assert any(s.state == "Test program" for s in states)
