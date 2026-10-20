@@ -69,19 +69,15 @@ output and nonzero heating-output indication; pause is not equivalent to stop.
 The first running-state update still contained earlier setpoint/output values,
 so a process transition does not imply that every measurement changed atomically.
 
-The original program selection was restored after stopping. Two subsequent
-fresh controller states confirmed readiness, zero setpoint and zero digital
-outputs. This establishes the reported non-heating state; it does not turn off
-the controller's mains supply or independently measure electrical current.
-Delayed starts remain unvalidated.
+After stopping, check fresh controller feedback for zero setpoint and zero
+digital outputs. This feedback does not confirm mains disconnection or measure
+electrical current. Delayed starts have not been tested.
 
 ## Program editing and readback
 
-Program-content editing has been tested by changing a single temperature target
-by one degree, reading it back from the controller, and restoring the original.
-The restored definition and checksum matched the original device readback.
-No firing was started, and the final fresh controller state had zero setpoint
-and zero digital outputs. The existing program selection was unchanged.
+Program editing has been checked with a small temperature change followed by
+device readback and restoration. The restored definition and checksum matched
+the original. The test left program selection unchanged and did not start a firing.
 
 | Operation | Interface |
 | --- | --- |
@@ -99,9 +95,8 @@ round trips. A cached HTTP response alone is not proof of a new device readback.
 
 The generic `/controller/{sn}/responsestatus` endpoint returned HTTP 404 for a
 program-read request; the program-topic message is the applicable readback
-confirmation. A requested message was delayed once beyond the capture timeout;
-a subsequent explicit read request confirmed successful restoration. Do not
-resubmit program writes merely because a readback capture times out.
+confirmation. Program-topic responses can arrive after the readback timeout.
+Request a fresh readback before deciding whether another write is needed.
 
 ## Programs, history and sessions
 

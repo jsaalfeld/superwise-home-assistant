@@ -1,14 +1,14 @@
 # Superwise for Home Assistant
 
-Custom integration for bentrup SuperWise kiln controllers. Provides live readout,
-program selection, execution controls, program-segment editing and firing-history
-actions. Uses the same undocumented cloud interfaces as the SuperWise website.
+A Home Assistant integration for bentrup SuperWise kiln controllers. Read live
+values, select programs, control a firing, edit program segments and retrieve
+firing history. It connects through the same cloud interfaces as the SuperWise
+website. These interfaces are undocumented and may change.
 
-**Experimental release:** tested with Home Assistant 2026.10.2 and synthetic cloud
-responses. Setup, live readout, read-only actions and option reload with a saved
-session have also been verified on a TC75 controller. Execution controls were
-verified separately at protocol level; validate them in the installed integration
-under supervision before production use.
+**Experimental:** tested with Home Assistant 2026.10.2 and a TC75 controller.
+Setup, live values, read-only actions and options reload have been checked in HA.
+Start, pause, continue and stop have been tested directly against the controller,
+but still need a supervised test through the installed integration.
 
 ## Installation
 
@@ -29,10 +29,10 @@ be extracted into the Home Assistant configuration directory. Do not copy `.env`
 
 ### HACS custom repository
 
-Once this version is available on the repository's default branch, add
+Add
 `https://github.com/jsaalfeld/superwise-home-assistant` as a HACS custom repository
 of type **Integration**, download **Superwise**, restart HA and follow the setup
-steps above. This is not a claim of inclusion in the default HACS catalog.
+steps above. The integration is not listed in the default HACS catalog.
 
 ## Account sessions
 
@@ -93,7 +93,7 @@ submitting. The response includes `previous_program` and the verified new progra
 A write or readback failure is not automatically retried or rolled back: inspect
 the controller state before another write. Program edits never start a firing.
 
-Example script action with synthetic values:
+Example script action:
 
 ```yaml
 action: superwise.update_program
@@ -108,9 +108,9 @@ response_variable: program_result
 Historical curves are returned as action responses, not stored in entity
 attributes or the state recorder. The firing list may be incomplete. Record
 start/end semantics can include recording beyond program completion; recording
-duration is deliberately not labelled as exact heating or firing duration.
+duration may differ from heating or firing duration.
 
-## Power and energy
+## Estimated power
 
 Estimated power is `rated_power_kw × heating_output / 100`. This assumes the
 percentage represents average heater duty and is **not measured electrical
@@ -124,14 +124,14 @@ and explicit treatment of missing intervals.
 - Hardware behavior was explored with TC75; other controllers are unverified.
 - Delayed start, alarm management, ramp editing and complete website/account
   administration are not implemented.
-- No public-cloud hardware tests are run automatically in CI.
+- Automated tests use synthetic data and do not connect to a real controller.
 
 See [protocol notes](docs/findings.md), [architecture](docs/architecture.md) and
 [validation procedure](docs/test-plan.md).
 
 ## Development
 
-The standalone diagnostic CLI remains available as `python3 -m superwise`.
+The standalone diagnostic CLI is available as `python3 -m superwise`.
 Only that CLI reads `.env`; the HA integration uses its setup/options dialogs.
 The `.env.example` template documents the diagnostic settings. Explicit CLI login
 may displace an existing account session, just like integration setup.
@@ -140,7 +140,7 @@ may displace an existing account session, just like integration setup.
 # Standard-library diagnostic tests:
 python3 -m unittest discover -v
 
-# Rootless isolated HA tests (the run has no network):
+# Home Assistant tests in a container without network access:
 podman build -f Containerfile.test -t superwise-ha-test .
 podman run --rm --network none \
   -v "$PWD/custom_components:/work/custom_components:ro,Z" \

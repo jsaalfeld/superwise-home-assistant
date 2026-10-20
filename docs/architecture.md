@@ -35,7 +35,7 @@ is retained but not editable through the service.
 
 ## Diagnostic package
 
-`superwise/` remains a standard-library research CLI with validated `.env`
+`superwise/` is a standard-library diagnostic CLI with validated `.env`
 settings, cookie-session reuse, bounded live capture and private artifact output.
 Its synchronous transport is separate from HA's asynchronous client. Both use
 allowlisted controller data and distinguish estimated from measured power.

@@ -1,4 +1,4 @@
-# Validation procedure
+# Testing
 
 Automated tests use synthetic data and must run without cloud access:
 
@@ -31,7 +31,7 @@ A successful empty HTTP response does not establish that the controller executed
 an action. Verify the resulting state before sending another action. Do not
 retry ambiguous control requests blindly.
 
-## Evidence
+## Test notes
 
 Record expected and actual behavior, relevant controller states, sequence
 numbers and timestamps. Keep credentials, coupling secrets, personal device
@@ -47,7 +47,7 @@ reuse, explicit reauthentication, options, entity registration/unload, stale
 availability, command gating, single-send behavior, program readback comparisons
 and response actions. No actual kiln commands are sent by automated tests.
 
-Before production use, install the custom integration and validate readout first,
+When testing on hardware, install the integration and check live values first,
 then enable remote control for a supervised control test. Protocol-level hardware
 tests do not replace testing the complete installed HA integration. Verify unload,
 restart and replacement of the session from the website without automatic login.

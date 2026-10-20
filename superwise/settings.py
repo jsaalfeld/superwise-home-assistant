@@ -1,4 +1,4 @@
-"""Prototype settings corresponding to a future integration's configuration."""
+"""Environment settings for the standalone diagnostic client."""
 from dataclasses import dataclass, field
 import math
 import os
