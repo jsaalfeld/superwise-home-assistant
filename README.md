@@ -14,25 +14,32 @@ but still need a supervised test through the installed integration.
 
 Requires Home Assistant 2026.10 or newer.
 
+### HACS
+
+[![Open Superwise in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jsaalfeld&repository=superwise-home-assistant&category=integration)
+
+1. Click the button above, or open **HACS → ⋮ → Custom repositories** and add
+   `https://github.com/jsaalfeld/superwise-home-assistant` as **Integration**.
+2. Download **Superwise** and restart Home Assistant.
+3. Open **Settings → Devices & services → Add integration → Superwise**, or use:
+
+   [![Set up Superwise](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=superwise)
+
+4. Enter the server URL, credentials, six-digit controller serial and optional
+   rated power in kW. Use 0 to disable the power estimate.
+
+The HACS button opens the repository in your Home Assistant instance. Confirm
+adding it and download the integration there.
+
 ### Manual installation
 
 1. Copy `custom_components/superwise` into `/config/custom_components/superwise`.
    The final path must be `/config/custom_components/superwise/manifest.json`.
-2. Restart Home Assistant.
-3. Open **Settings → Devices & services → Add integration → Superwise**.
-4. Enter the server URL, credentials, six-digit controller serial and optional
-   rated power in kW. Use 0 to disable the power estimate.
+2. Restart Home Assistant and follow the setup steps above.
 
 A distribution ZIP contains the `custom_components/superwise/` directory and can
 be extracted into the Home Assistant configuration directory. Do not copy `.env`,
 `.local`, captured data or the standalone diagnostic client into Home Assistant.
-
-### HACS custom repository
-
-Add
-`https://github.com/jsaalfeld/superwise-home-assistant` as a HACS custom repository
-of type **Integration**, download **Superwise**, restart HA and follow the setup
-steps above. The integration is not listed in the default HACS catalog.
 
 ## Account sessions
 
