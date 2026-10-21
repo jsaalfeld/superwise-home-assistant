@@ -1,6 +1,7 @@
 {
   "domain": "superwise",
   "name": "Superwise",
+  "categories": ["appliances_cleaning"],
   "codeowners": ["@jsaalfeld"],
   "config_flow": true,
   "documentation": "https://github.com/jsaalfeld/superwise-home-assistant",
