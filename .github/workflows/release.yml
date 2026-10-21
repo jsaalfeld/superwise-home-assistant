@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  validate:
+    uses: ./.github/workflows/validate.yml
+
+  publish:
+    name: Publish release
+    needs: [tests, validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build integration archive
+        run: python3 .github/scripts/build_release.py "$GITHUB_REF_NAME"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/superwise.zip dist/SHA256SUMS \
+            --verify-tag \
+            --title "Superwise $GITHUB_REF_NAME" \
+            --notes-file "docs/releases/${GITHUB_REF_NAME#v}.md" \
+            --latest
