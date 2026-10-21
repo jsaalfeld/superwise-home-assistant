@@ -13,7 +13,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import AuthenticationError, CommandError, SuperwiseError
-from .const import CONF_CONTROL, DOMAIN
+from .const import CONF_CONTROL, CONF_COOKIES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +34,10 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
         self._unsub_tick = None
         self._operation_lock = asyncio.Lock()
         self.authentication_lost = False
+        self.options = dict(entry.options)
+        self._login_lock = asyncio.Lock()
+        self._last_login = float("-inf")
+        self._session_generation = 0
 
     @property
     def control_enabled(self):
@@ -43,21 +47,52 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
         if self.authentication_lost:
             raise ConfigEntryAuthFailed("Session expired; explicit sign-in is required")
         try:
-            state = await self.api.state()
-            if self.data:
-                state = {**self.data, **state}
-            if not self.data or time.monotonic() - self._metadata_at >= 120:
-                state["programs"] = await self.api.programs()
-                state["firings"] = await self.api.firings()
-                self._metadata_at = time.monotonic()
-            return state
+            generation = self._session_generation
+            try:
+                return await self._fetch_data()
+            except AuthenticationError:
+                await self._renew_session(generation)
+                return await self._fetch_data()
         except AuthenticationError as err:
             self.authentication_lost = True
             raise ConfigEntryAuthFailed(
-                "Session expired; explicit sign-in is required"
+                "Stored credentials rejected; sign in again"
             ) from err
         except SuperwiseError as err:
             raise UpdateFailed("Superwise update failed") from err
+
+    async def _fetch_data(self):
+        state = await self.api.state()
+        if self.data:
+            state = {**self.data, **state}
+        if not self.data or time.monotonic() - self._metadata_at >= 120:
+            state["programs"] = await self.api.programs()
+            state["firings"] = await self.api.firings()
+            self._metadata_at = time.monotonic()
+        return state
+
+    async def _renew_session(self, generation):
+        async with self._login_lock:
+            if generation != self._session_generation:
+                return
+            if self.authentication_lost or not self.entry.data.get("password"):
+                raise AuthenticationError("Stored credentials unavailable")
+            if time.monotonic() - self._last_login < 60:
+                raise SuperwiseError("Session renewal deferred")
+            self._last_login = time.monotonic()
+            try:
+                await self.api.login(
+                    self.entry.data["username"], self.entry.data["password"]
+                )
+            except AuthenticationError:
+                self.authentication_lost = True
+                raise
+            self._session_generation += 1
+            self._metadata_at = 0
+            self.hass.config_entries.async_update_entry(
+                self.entry,
+                data={**self.entry.data, CONF_COOKIES: self.api.cookies()},
+            )
 
     def start(self):
         self._stream_task = self.hass.async_create_background_task(
@@ -101,10 +136,10 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
                         )
                     delay = 5
             except AuthenticationError:
-                self.authentication_lost = True
-                self.async_set_update_error(ConfigEntryAuthFailed("Session expired"))
-                self.entry.async_start_reauth(self.hass)
-                return
+                await self.async_refresh()
+                if self.authentication_lost:
+                    return
+                await asyncio.sleep(delay)
             except (SuperwiseError, ValueError, KeyError):
                 # Retain timestamp-based availability; a failed transport may recover.
                 await asyncio.sleep(delay)
@@ -137,9 +172,11 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
                 self.async_set_updated_data({**self.data, **state})
                 return None
             except AuthenticationError as err:
-                self.authentication_lost = True
-                self.entry.async_start_reauth(self.hass)
-                raise HomeAssistantError("Session expired; sign in again") from err
+                # Renew authentication, but never replay a controller command.
+                await self.async_refresh()
+                raise HomeAssistantError(
+                    "Session expired; check controller state before retrying"
+                ) from err
             except (CommandError, SuperwiseError) as err:
                 # These exception messages are deliberately free of response bodies/secrets.
                 raise HomeAssistantError(str(err)) from err

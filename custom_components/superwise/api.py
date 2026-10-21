@@ -31,7 +31,7 @@ class CommandError(SuperwiseError):
     """A command was rejected or its result could not be verified."""
 
 
-def validate_config(values):
+def validate_config(values, *, require_serial=True):
     """Normalize UI input without including secrets in exceptions."""
     result = dict(values)
     base = str(values.get("url", DEFAULT_URL)).strip().rstrip("/")
@@ -49,7 +49,7 @@ def validate_config(values):
     ):
         raise ValueError("invalid_url")
     serial = str(values.get("serial_number", "")).strip()
-    if not re.fullmatch(r"[0-9]{6}", serial):
+    if (require_serial or serial) and not re.fullmatch(r"[0-9]{6}", serial):
         raise ValueError("invalid_serial")
     power = str(values.get("rated_power_kw", "")).strip()
     try:
@@ -65,7 +65,7 @@ def validate_config(values):
 class SuperwiseApi:
     """One isolated session per configured account; never auto-login."""
 
-    def __init__(self, base, serial, power=None, cookies=None, session=None):
+    def __init__(self, base, serial=None, power=None, cookies=None, session=None):
         self.base = base
         self.serial = serial
         self.power = power or None
@@ -173,15 +173,32 @@ class SuperwiseApi:
         )
         await self.request("/dashboard")
 
-    async def state(self):
+    async def controllers(self):
+        """Discover controllers through JSON, retaining only public device fields."""
         try:
-            page = await self.request(f"/controller/{self.serial}/view")
-            raw = embedded(page, "controlUnit")
-            if str(raw["serialNumber"]) != self.serial:
-                raise SuperwiseError("Controller mismatch")
-            return {"controller": controller_summary(raw, self.power)}
-        except (ValueError, KeyError, TypeError) as err:
+            raw = json.loads(await self.request("/controller/menu"))
+            if not isinstance(raw, list):
+                raise TypeError
+            controllers = {}
+            for item in raw:
+                if not isinstance(item, dict):
+                    raise TypeError
+                serial = str(item["serialNumber"])
+                if not re.fullmatch(r"[0-9]{6}", serial) or serial in controllers:
+                    raise ValueError
+                controllers[serial] = {
+                    **controller_summary(item, self.power),
+                    "serialNumber": serial,
+                }
+            return controllers
+        except (ValueError, KeyError, TypeError, OverflowError) as err:
             raise SuperwiseError("Unexpected controller response") from err
+
+    async def state(self):
+        controllers = await self.controllers()
+        if self.serial not in controllers:
+            raise SuperwiseError("Configured controller not found in account")
+        return {"controller": controllers[self.serial]}
 
     async def programs(self):
         try:

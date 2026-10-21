@@ -7,6 +7,7 @@ They are not a documented public API and may change.
 | --- | --- |
 | `POST /login` | Form fields `username`, `password`; cookie session |
 | `GET /dashboard` | HTML containing `controllers.content` |
+| `GET /controller/menu` | JSON list of account controllers and current state |
 | `GET /controller/{sn}/view` | Embedded controller, sensors, program names, status and alarms |
 | `GET /controller/{sn}/onlinestatus` | Text status such as `PS_RUNNING` or `Offline` |
 | `GET /sensor/{sn}/identifier/IN0` | Sensor metadata as JSON |
@@ -14,6 +15,11 @@ They are not a documented public API and may change.
 | `GET /firings` | HTML containing firing records |
 | `GET /controller/{sn}/{sensor}/chartdata/{from_ms}/{to_ms}/0` | JSON metadata and timestamp/value pairs, UTC offset 0 |
 | SockJS `/ws`, STOMP `/topic/{sn}/data` | Controller state, sensors and optional alarm/event updates |
+
+The integration uses `/controller/menu` for discovery and periodic state checks.
+Only allowlisted fields are retained: raw responses also contain account and
+coupling data. The configured serial identifies the selected controller; a missing
+controller is an error rather than a reason to switch to another device.
 
 ## Live data
 

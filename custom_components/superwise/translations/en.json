@@ -4,20 +4,26 @@
     "step": {
       "user": {
         "title": "Superwise",
-        "description": "Signing in may displace another session for the same account. The integration never automatically signs in after session loss.",
+        "description": "The integration automatically renews expired sessions with the stored password. This may displace other sessions for the same account.",
         "data": {
           "url": "Server URL",
           "username": "Username",
           "password": "Password",
-          "serial_number": "Controller serial number",
           "rated_power_kw": "Rated power in kW (0 disables estimation)"
         }
       },
       "reauth_confirm": {
         "title": "Sign in to Superwise again",
-        "description": "The session expired or was replaced. Submitting creates a new session and may displace other sessions.",
+        "description": "Submit to sign in again with the stored password. Leave the password field empty to reuse it, or enter a different password. This may displace other sessions for the same account.",
         "data": {
-          "password": "Password"
+          "password": "Different password"
+        }
+      },
+      "controller": {
+        "title": "Choose a controller",
+        "description": "Choose the kiln to use from your Superwise account.",
+        "data": {
+          "serial_number": "Controller"
         }
       }
     },
@@ -26,12 +32,14 @@
       "cannot_connect": "Cannot connect or unsupported server response.",
       "invalid_url": "Enter an HTTPS server origin without a path.",
       "invalid_serial": "The controller serial must contain six digits.",
-      "invalid_power": "Enter a finite nonnegative rated power."
+      "invalid_power": "Enter a finite nonnegative rated power.",
+      "invalid_controller": "Choose one of the discovered controllers."
     },
     "abort": {
       "already_configured": "This controller is already configured.",
       "account_already_configured": "This account is already configured.",
-      "reauth_successful": "Reauthentication successful."
+      "reauth_successful": "Reauthentication successful.",
+      "no_controllers": "No controllers are linked to this account."
     }
   },
   "options": {
@@ -86,6 +94,9 @@
       },
       "last_record_duration": {
         "name": "Last completed record duration"
+      },
+      "error": {
+        "name": "Error code"
       }
     },
     "button": {

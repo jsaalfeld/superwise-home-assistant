@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.config_entries import SOURCE_USER
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
@@ -38,7 +38,11 @@ async def test_user_flow_creates_session_once(hass, mock_api):
         result = await hass.config_entries.flow.async_init(
             "superwise",
             context={"source": SOURCE_USER},
-            data={k: v for k, v in DATA.items() if k != "session_cookies"},
+            data={
+                k: v
+                for k, v in DATA.items()
+                if k not in ("session_cookies", "serial_number")
+            },
         )
         # Flow completion schedules entry setup in the background.
         await hass.async_block_till_done()
@@ -126,9 +130,10 @@ async def test_stale_measurements_become_unavailable(hass, mock_api):
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_auth_failure_requests_reauth_not_login(hass, mock_api):
+async def test_rejected_stored_password_requests_reauth(hass, mock_api):
     entry = await setup(hass, mock_api)
     mock_api.state.side_effect = AuthenticationError("expired")
+    mock_api.login.side_effect = AuthenticationError("rejected")
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
     assert entry.runtime_data.authentication_lost
@@ -136,11 +141,14 @@ async def test_auth_failure_requests_reauth_not_login(hass, mock_api):
         f["context"].get("source") == "reauth"
         for f in hass.config_entries.flow.async_progress()
     )
-    mock_api.login.assert_not_called()
+    mock_api.login.assert_awaited_once_with(DATA["username"], DATA["password"])
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_reauth_requires_submission(hass, mock_api):
+@pytest.mark.parametrize(
+    "submission", [{}, {"password": ""}, {"password": "new-synthetic"}]
+)
+async def test_reauth_requires_submission(hass, mock_api, submission):
     entry = MockConfigEntry(
         domain="superwise", data=DATA, unique_id="https://www.superwise.eu:100001"
     )
@@ -161,14 +169,17 @@ async def test_reauth_requires_submission(hass, mock_api):
             data=DATA,
         )
         assert result["step_id"] == "reauth_confirm"
+        assert "synthetic" not in repr(result["data_schema"])
         mock_api.login.assert_not_called()
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"password": "new-synthetic"}
+            result["flow_id"], submission
         )
         await hass.async_block_till_done()
         assert result["type"] is FlowResultType.ABORT
         assert result["reason"] == "reauth_successful"
-        mock_api.login.assert_awaited_once()
+        expected_password = submission.get("password") or DATA["password"]
+        mock_api.login.assert_awaited_once_with(DATA["username"], expected_password)
+        assert entry.data["password"] == expected_password
 
 
 async def test_options_validate_without_cloud_login(hass, mock_api):
@@ -278,3 +289,147 @@ def test_service_fractional_numbers_are_not_truncated(value):
 
     with pytest.raises(vol.Invalid):
         whole_number(value)
+
+
+async def test_expired_session_renews_and_persists_without_reload(hass, mock_api):
+    entry = await setup(hass, mock_api)
+    snapshot = deepcopy(mock_api.state.return_value)
+    mock_api.state.side_effect = [AuthenticationError("expired"), snapshot]
+    mock_api.cookies = lambda: [{"name": "SESSION", "value": "renewed", "path": "/"}]
+    with patch.object(hass.config_entries, "async_reload", new=AsyncMock()) as reload:
+        await entry.runtime_data.async_refresh()
+        await hass.async_block_till_done()
+        reload.assert_not_called()
+    assert not entry.runtime_data.authentication_lost
+    mock_api.login.assert_awaited_once_with(DATA["username"], DATA["password"])
+    assert entry.data["session_cookies"][0]["value"] == "renewed"
+    mock_api.state.side_effect = AuthenticationError("expired again")
+    await entry.runtime_data.async_refresh()
+    assert mock_api.login.await_count == 1
+    assert not entry.runtime_data.authentication_lost
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_expired_command_is_not_replayed(hass, mock_api):
+    entry = await setup(hass, mock_api, {"enable_control": True})
+    snapshot = deepcopy(mock_api.state.return_value)
+    mock_api.command.side_effect = AuthenticationError("expired")
+    mock_api.state.side_effect = [AuthenticationError("expired"), snapshot]
+    with pytest.raises(HomeAssistantError, match="check controller state"):
+        await entry.runtime_data.operation("start")
+    mock_api.command.assert_awaited_once_with("start")
+    mock_api.login.assert_awaited_once()
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_discovery_selects_controller_without_second_login(hass, mock_api):
+    mock_api.controllers.return_value = {
+        "100001": {"name": "Test kiln", "serialNumber": "100001"},
+        "100002": {"name": "Other kiln", "serialNumber": "100002"},
+    }
+    credentials = {
+        k: DATA[k] for k in ("url", "username", "password", "rated_power_kw")
+    }
+    with (
+        patch(
+            "custom_components.superwise.config_flow.SuperwiseApi",
+            return_value=mock_api,
+        ),
+        patch(
+            "custom_components.superwise.async_setup_entry",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "superwise", context={"source": SOURCE_USER}, data=credentials
+        )
+        assert result["step_id"] == "controller"
+        with pytest.raises(InvalidData):
+            await hass.config_entries.flow.async_configure(
+                result["flow_id"], {"serial_number": "999999"}
+            )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"serial_number": "100002"}
+        )
+        await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["serial_number"] == "100002"
+    assert result["result"].unique_id == "https://www.superwise.eu:100002"
+    assert result["title"] == "Other kiln"
+    mock_api.login.assert_awaited_once()
+    mock_api.controllers.assert_awaited_once()
+    mock_api.command.assert_not_called()
+
+
+async def test_discovery_without_controllers_aborts(hass, mock_api):
+    mock_api.controllers.return_value = {}
+    with patch(
+        "custom_components.superwise.config_flow.SuperwiseApi", return_value=mock_api
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "superwise",
+            context={"source": SOURCE_USER},
+            data={k: DATA[k] for k in ("url", "username", "password")},
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_controllers"
+    mock_api.close.assert_awaited_once()
+
+
+async def test_existing_controller_via_another_account_is_not_duplicated(
+    hass, mock_api
+):
+    MockConfigEntry(
+        domain="superwise", data=DATA, unique_id="https://www.superwise.eu:100001"
+    ).add_to_hass(hass)
+    with patch(
+        "custom_components.superwise.config_flow.SuperwiseApi", return_value=mock_api
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "superwise",
+            context={"source": SOURCE_USER},
+            data={**DATA, "username": "another-account"},
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+@pytest.mark.parametrize("initial_error", [0, None])
+async def test_error_sensor_preserves_zero_and_updates(hass, mock_api, initial_error):
+    from homeassistant.helpers import entity_registry as er
+
+    mock_api.state.return_value["controller"]["error"] = initial_error
+    entry = await setup(hass, mock_api)
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "sensor", "superwise", f"{entry.unique_id}_error"
+    )
+    assert hass.states.get(entity_id).state == "0"
+    updated = deepcopy(entry.runtime_data.data)
+    updated["controller"]["error"] = 42
+    entry.runtime_data.async_set_updated_data(updated)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "42"
+    updated = deepcopy(updated)
+    updated["controller"].pop("error")
+    entry.runtime_data.async_set_updated_data(updated)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "unavailable"
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_discovery_rejected_credentials_do_not_create_entry(hass, mock_api):
+    mock_api.login.side_effect = AuthenticationError("Synthetic rejected password")
+    with patch(
+        "custom_components.superwise.config_flow.SuperwiseApi", return_value=mock_api
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "superwise",
+            context={"source": SOURCE_USER},
+            data={k: DATA[k] for k in ("url", "username", "password")},
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+    mock_api.controllers.assert_not_called()
+    mock_api.close.assert_awaited_once()
+    assert "synthetic" not in repr(result["data_schema"])

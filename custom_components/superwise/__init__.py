@@ -9,14 +9,14 @@ from .services import async_register_services
 
 
 async def async_setup_entry(hass, entry):
-    # Never silently log in on restart, option changes or recovery.
-    if not entry.data.get(CONF_COOKIES):
+    # Reuse the session first; the coordinator renews it when necessary.
+    if not entry.data.get(CONF_COOKIES) and not entry.data.get("password"):
         raise ConfigEntryAuthFailed("Sign in to create a session")
     api = SuperwiseApi(
         entry.data[CONF_URL],
         entry.data[CONF_SERIAL],
         entry.options.get(CONF_POWER, entry.data.get(CONF_POWER)),
-        entry.data[CONF_COOKIES],
+        entry.data.get(CONF_COOKIES, []),
     )
     coordinator = SuperwiseCoordinator(hass, entry, api)
     try:
@@ -33,7 +33,9 @@ async def async_setup_entry(hass, entry):
 
 
 async def async_reload_entry(hass, entry):
-    await hass.config_entries.async_reload(entry.entry_id)
+    coordinator = getattr(entry, "runtime_data", None)
+    if coordinator is None or coordinator.options != dict(entry.options):
+        await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass, entry):

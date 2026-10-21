@@ -25,8 +25,9 @@ Requires Home Assistant 2026.10 or newer.
 
    [![Set up Superwise](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=superwise)
 
-4. Enter the server URL, credentials, six-digit controller serial and optional
-   rated power in kW. Use 0 to disable the power estimate.
+4. Enter the server URL, credentials and optional rated power in kW. Use 0 to
+   disable the power estimate. The integration finds the controllers in your
+   account. If there is more than one, choose the kiln to use.
 
 The HACS button opens the repository in your Home Assistant instance. Confirm
 adding it and download the integration there.
@@ -43,13 +44,16 @@ be extracted into the Home Assistant configuration directory. Do not copy `.env`
 
 ## Account sessions
 
-Creating a session may invalidate another login for the same account. Setup and
-explicit reauthentication create a session. HA restarts, reconnects and option
-changes reuse the stored session; they never silently log in. If a browser or
-another client replaces that session, HA requests reauthentication and stops
-using it until the request is completed.
+Creating a session may invalidate another login for the same account. HA restarts,
+reconnects and option changes reuse the stored session first. When that session
+expires or is replaced, the integration automatically signs in with the stored
+password and saves the renewed session. Login attempts are serialized and limited
+to one per minute. Rejected credentials require explicit reauthentication. Confirm
+that request with the stored password or enter a replacement password. Controller
+commands are never automatically replayed after authentication failure.
 
-One configuration per account is allowed to avoid competing sessions inside HA.
+One kiln per account can be configured to avoid competing sessions inside HA.
+Existing configurations keep their selected controller and entity IDs.
 Independent access using separate accounts for the same kiln is not yet verified.
 Credentials and session cookies are stored in HA's private config-entry storage;
 include that storage in your normal secret and backup handling.
@@ -62,6 +66,7 @@ The integration creates a device with:
 - Estimated electrical power when rated power is configured.
 - Process status, program name, segment and segment remaining time.
 - Last contact, latest record start and last completed recording duration.
+- Controller error code as a diagnostic sensor (0 means no reported error).
 - Connection and program-active binary sensors.
 - Program selection plus Start, Stop, Pause and Continue buttons.
 
@@ -77,7 +82,7 @@ does not disconnect the mains supply. An uncertain command result is reported
 without automatically repeating the command.
 
 Values become unavailable when the controller timestamp is at least 60 seconds
-old. Live STOMP updates are combined with periodic HTTP checks and metadata
+old. Live STOMP updates are combined with periodic JSON status checks and metadata
 refreshes. Missing heating output is not treated as zero.
 
 ## Program and history actions

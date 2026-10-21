@@ -30,6 +30,7 @@ def snapshot():
             "setpoint": 0.0,
             "lpValue": None,
             "doValue": 0,
+            "error": 0,
             "rated_power_kw": 6.0,
             "estimated_power_kw": None,
         }
@@ -52,6 +53,7 @@ def mock_api(snapshot, program):
     api = AsyncMock()
     api.power = 6.0
     api.state.return_value = snapshot
+    api.controllers.return_value = {"100001": snapshot["controller"]}
     api.programs.return_value = {1: program}
     api.firings.return_value = [
         {

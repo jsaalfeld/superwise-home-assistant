@@ -9,7 +9,8 @@ installation does not depend on the diagnostic package at repository root.
   Same-origin redirects only; a same-host HTTP login redirect is upgraded locally
   to HTTPS before any request. No implicit authentication or command retries.
 - `config_flow.py`: setup, explicit reauthentication and options. Duplicate
-  controllers and duplicate sessions for an account are rejected before login.
+  account sessions are rejected before login; controller identities are checked
+  after discovery. A single controller is selected automatically.
 - `coordinator.py`: shared live state, periodic metadata, stale-state checking,
   reconnect backoff, serialized control operations and resource cleanup.
 - `models.py`: JSON parsing, sanitized controller fields and numeric handling.
@@ -20,8 +21,11 @@ installation does not depend on the diagnostic package at repository root.
 The integration never imports the repository-level diagnostic client. It does
 not read `.env`, reuse browser cookies or depend on any local hardware captures.
 HA stores account credentials and session cookies in private config-entry storage.
-Session loss initiates a reauthentication request without starting a login loop.
+Expired sessions are renewed with stored credentials under a login lock and a
+one-minute retry limit. Rejected credentials initiate explicit reauthentication.
 
+Controller discovery and periodic state checks use the `/controller/menu` JSON
+endpoint. Only the configured serial is used; an absent controller is an error.
 Push updates use the observed SockJS XHR transport. Timestamp-based availability
 is checked separately so continuous messages with stale device timestamps do not
 keep measurements available. Periodic HTTP metadata refresh is scheduled even

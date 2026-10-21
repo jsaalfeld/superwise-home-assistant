@@ -4,20 +4,26 @@
     "step": {
       "user": {
         "title": "Superwise",
-        "description": "Die Anmeldung kann eine vorhandene Sitzung desselben Benutzers abmelden. Die Integration meldet sich bei Sitzungsverlust nicht automatisch erneut an.",
+        "description": "Die Integration erneuert abgelaufene Sitzungen automatisch mit dem gespeicherten Passwort. Dabei können andere Sitzungen desselben Kontos abgemeldet werden.",
         "data": {
           "url": "Server-URL",
           "username": "Benutzername",
           "password": "Passwort",
-          "serial_number": "Regler-Seriennummer",
           "rated_power_kw": "Nennleistung in kW (0 deaktiviert die Schätzung)"
         }
       },
       "reauth_confirm": {
         "title": "Erneut bei Superwise anmelden",
-        "description": "Die Sitzung ist abgelaufen oder wurde ersetzt. Mit dem Absenden wird eine neue Sitzung erstellt; andere Sitzungen können abgemeldet werden.",
+        "description": "Mit dem Absenden meldest du dich mit dem gespeicherten Passwort erneut an. Lass das Passwortfeld dafür leer oder gib ein anderes Passwort ein. Andere Sitzungen desselben Kontos können dabei abgemeldet werden.",
         "data": {
-          "password": "Passwort"
+          "password": "Anderes Passwort"
+        }
+      },
+      "controller": {
+        "title": "Regler auswählen",
+        "description": "Wähle den Ofen aus deinem Superwise-Konto aus.",
+        "data": {
+          "serial_number": "Regler"
         }
       }
     },
@@ -26,12 +32,14 @@
       "cannot_connect": "Superwise ist nicht erreichbar oder die Antwort wird nicht unterstützt.",
       "invalid_url": "Eine HTTPS-Serveradresse ohne Pfad angeben.",
       "invalid_serial": "Die Seriennummer muss sechsstellig sein.",
-      "invalid_power": "Eine gültige nichtnegative Nennleistung angeben."
+      "invalid_power": "Eine gültige nichtnegative Nennleistung angeben.",
+      "invalid_controller": "Wähle einen der gefundenen Regler aus."
     },
     "abort": {
       "already_configured": "Dieser Regler ist bereits eingerichtet.",
       "account_already_configured": "Dieses Konto ist bereits eingerichtet.",
-      "reauth_successful": "Erneute Anmeldung erfolgreich."
+      "reauth_successful": "Erneute Anmeldung erfolgreich.",
+      "no_controllers": "Diesem Konto sind keine Regler zugeordnet."
     }
   },
   "options": {
@@ -86,6 +94,9 @@
       },
       "last_record_duration": {
         "name": "Dauer der letzten abgeschlossenen Aufzeichnung"
+      },
+      "error": {
+        "name": "Fehlercode"
       }
     },
     "button": {

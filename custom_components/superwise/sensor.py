@@ -9,7 +9,13 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 
 from .entity import SuperwiseEntity
 
@@ -53,6 +59,12 @@ DESCRIPTIONS = (
     ),
     SensorEntityDescription(
         key="process_status", translation_key="process_status", icon="mdi:state-machine"
+    ),
+    SensorEntityDescription(
+        key="error",
+        translation_key="error",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:alert-circle-outline",
     ),
     SensorEntityDescription(
         key="program_name",
@@ -124,6 +136,10 @@ class SuperwiseSensor(SuperwiseEntity, SensorEntity):
             )
         if key == "process_status":
             return ctrl.get("processStatus")
+        if key == "error":
+            if "error" not in ctrl:
+                return None
+            return ctrl["error"] if ctrl["error"] is not None else 0
         if key == "program_name":
             program = data.get("programs", {}).get(ctrl.get("progNumber"), {})
             return program.get("name")

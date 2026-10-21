@@ -19,7 +19,10 @@ class SuperwiseEntity(CoordinatorEntity):
             manufacturer="bentrup",
             model=ctrl.get("type"),
             serial_number=coordinator.entry.data[CONF_SERIAL],
-            configuration_url=coordinator.entry.data[CONF_URL] + "/dashboard",
+            configuration_url=(
+                coordinator.entry.data[CONF_URL]
+                + f"/controller/{coordinator.entry.data[CONF_SERIAL]}/view"
+            ),
         )
 
     @property

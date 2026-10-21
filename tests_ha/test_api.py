@@ -70,12 +70,11 @@ async def test_persistent_cookies_survive_new_client(api):
 
 
 async def test_state_redacts_pin_and_account_fields(api):
-    page = (
-        "let controlUnit = "
-        + json.dumps({"serialNumber": "100001", "pin": "SECRET", "owner": "PRIVATE"})
-        + ";"
+    api.request = AsyncMock(
+        return_value=json.dumps(
+            [{"serialNumber": "100001", "pin": "SECRET", "owner": "PRIVATE"}]
+        )
     )
-    api.request = AsyncMock(return_value=page)
     result = await api.state()
     assert "SECRET" not in json.dumps(result)
     assert "PRIVATE" not in json.dumps(result)
@@ -285,3 +284,76 @@ async def test_redirect_cannot_change_host_port_or_userinfo(api, target):
             "/login", method="POST", data={"password": "synthetic"}, login=True
         )
     assert request.call_count == 1
+
+
+async def test_json_discovery_and_state_select_only_configured_controller(
+    api, snapshot
+):
+    first = {
+        **snapshot["controller"],
+        "pin": "PRIVATE_PIN",
+        "usernames": ["PRIVATE_USER"],
+    }
+    second = {**snapshot["controller"], "serialNumber": "100002", "value": 999}
+    api.request = AsyncMock(return_value=json.dumps([second, first]))
+    controllers = await api.controllers()
+    assert set(controllers) == {"100001", "100002"}
+    assert "PRIVATE" not in json.dumps(controllers)
+    state = await api.state()
+    assert state["controller"]["value"] == 21.5
+    assert state["controller"]["error"] == 0
+    assert state["controller"]["fresh"]
+    assert all(
+        call.args == ("/controller/menu",) for call in api.request.call_args_list
+    )
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "<html>Login</html>",
+        "null",
+        "{}",
+        "[null]",
+        '[{"serialNumber": "100001/view"}]',
+        '[{"serialNumber": "100001"}, {"serialNumber": "100001"}]',
+        '[{"serialNumber": "100001", "lastActive": "invalid"}]',
+    ],
+)
+async def test_invalid_discovery_responses_rejected_without_raw_data(api, response):
+    api.request = AsyncMock(return_value=response)
+    with pytest.raises(SuperwiseError, match="Unexpected controller response"):
+        await api.controllers()
+
+
+async def test_missing_configured_controller_not_replaced_by_another(api):
+    api.request = AsyncMock(return_value='[{"serialNumber": "100002"}]')
+    with pytest.raises(SuperwiseError, match="not found"):
+        await api.state()
+
+
+async def test_json_status_retains_stale_state_and_missing_measurements(api):
+    api.request = AsyncMock(
+        return_value=json.dumps(
+            [{"serialNumber": "100001", "lastActive": 1, "pin": "PRIVATE"}]
+        )
+    )
+    state = await api.state()
+    assert not state["controller"]["fresh"]
+    assert state["controller"]["lpValue"] is None
+    assert state["controller"]["estimated_power_kw"] is None
+
+
+async def test_login_page_with_http_200_is_not_accepted(api):
+    response = MagicMock(status=200, url="https://www.superwise.eu/login")
+    response.text = AsyncMock(
+        return_value='<html><button id="login-button">Sign in</button></html>'
+    )
+    context = MagicMock()
+    context.__aenter__ = AsyncMock(return_value=response)
+    context.__aexit__ = AsyncMock(return_value=False)
+    with (
+        patch.object(api.session, "request", return_value=context),
+        pytest.raises(AuthenticationError),
+    ):
+        await api.request("/controller/menu")
