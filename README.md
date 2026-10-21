@@ -143,6 +143,10 @@ See [protocol notes](docs/findings.md), [architecture](docs/architecture.md) and
 
 ## Development
 
+GitHub Actions run the tests, hassfest and HACS validation. Validation also runs
+daily. Dependabot checks Python dependencies and GitHub Actions weekly and opens
+update pull requests.
+
 The standalone diagnostic CLI is available as `python3 -m superwise`.
 Only that CLI reads `.env`; the HA integration uses its setup/options dialogs.
 The `.env.example` template documents the diagnostic settings. Explicit CLI login
