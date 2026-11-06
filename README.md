@@ -14,23 +14,47 @@ but still need a supervised test through the installed integration.
 
 Requires Home Assistant 2026.10 or newer.
 
-### HACS
+### Marketplace (Home Assistant 2026.11 or newer)
+
+1. Open **Settings → Marketplace → Add from link** and enter
+   `https://github.com/jsaalfeld/superwise-home-assistant`.
+2. Connect your GitHub account if prompted. If asked for the content type,
+   select **Integration**.
+3. Open **Superwise** and select **Install**. Restart Home Assistant if prompted,
+   then follow the integration setup below.
+
+The Marketplace continues to use `hacs.json`; no separate Marketplace manifest
+is needed. Existing HACS installations and custom repositories migrate
+automatically when upgrading to Home Assistant 2026.11. The button below also
+continues to work in the Marketplace. See the
+[official Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/).
+
+Compatibility check: all nine integration modules import successfully with Home
+Assistant 2026.11.0. A complete test run on 2026.11 is not yet verified: the pinned
+`pytest-homeassistant-custom-component` package targets HA 2026.10.2 and fails
+during test initialization with 2026.11. Marketplace installation itself has not
+yet been tested end to end.
+
+### HACS (Home Assistant 2026.10)
 
 [![Open Superwise in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jsaalfeld&repository=superwise-home-assistant&category=integration)
 
 1. Click the button above, or open **HACS → ⋮ → Custom repositories** and add
    `https://github.com/jsaalfeld/superwise-home-assistant` as **Integration**.
 2. Download **Superwise** and restart Home Assistant.
-3. Open **Settings → Devices & services → Add integration → Superwise**, or use:
+
+### Integration setup
+
+1. Open **Settings → Devices & services → Add integration → Superwise**, or use:
 
    [![Set up Superwise](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=superwise)
 
-4. Enter the server URL, credentials and optional rated power in kW. Use 0 to
+2. Enter the server URL, credentials and optional rated power in kW. Use 0 to
    disable the power estimate. The integration finds the controllers in your
    account. If there is more than one, choose the kiln to use.
 
-The HACS button opens the repository in your Home Assistant instance. Confirm
-adding it and download the integration there.
+The repository button opens HACS or the Marketplace in your Home Assistant
+instance. Confirm adding it and install the integration there.
 
 ### Manual installation
 
@@ -138,6 +162,19 @@ and explicit treatment of missing intervals.
   administration are not implemented.
 - Automated tests use synthetic data and do not connect to a real controller.
 
+## Manufacturer protocol reference
+
+bentrup documents serial controller communication in
+[Application Note AN0902: Communication Options on bentrup Controllers](https://bentrup.de/wp-pdf/downloads/an/an0902.pdf).
+Option B describes a proprietary binary protocol over RS232/RS485; option A uses
+a licensed Windows DDE server. This is separate from the SuperWise cloud interface.
+Compatibility, connector pinout and interface availability must be confirmed for
+the specific controller before implementing a local connection. Serial support
+is not implemented in this integration.
+
+A local reference copy may be kept as `an0902.pdf` in the repository root. It is
+Git-ignored and must not be committed or included in release assets.
+
 See [protocol notes](docs/findings.md), [architecture](docs/architecture.md) and
 [validation procedure](docs/test-plan.md).
 
@@ -174,3 +211,23 @@ excluded from version control.
 ## License
 
 GNU General Public License v3.0; see [LICENSE](LICENSE).
+
+### Cooling time estimates
+
+Two timestamp sensors, **Estimated 200 °C time** and **Estimated 100 °C time**,
+show when the kiln is expected to cool to these temperatures. Home Assistant
+shows the timestamps in the user's local time zone.
+
+The estimate fits an exponential curve to up to two hours of recent temperature
+measurements, assuming a 15 °C ambient temperature. It needs at least 30 minutes
+of consistent cooling and rounds the predicted time to five minutes. This models
+the slowing cooling rate rather than extending a constant °C/hour decline.
+When available, Recorder history seeds the model after an integration reload or
+restart; Recorder is optional. No additional cloud history requests are made.
+
+Estimates are unavailable while a program is active, when heating is indicated,
+when telemetry is stale or interrupted, when the cooling trend is unsuitable,
+or once the respective target has already been reached. They describe measured
+kiln temperature, **not whether ware is safe to handle**. Loading, room temperature,
+and opening the kiln can change the actual cooling time; forecasts far into the
+future are approximate and are continuously revised.

@@ -21,6 +21,15 @@ from .entity import SuperwiseEntity
 
 PARALLEL_UPDATES = 0
 DESCRIPTIONS = (
+    *(
+        SensorEntityDescription(
+            key=f"cooling_{target}",
+            translation_key=f"cooling_{target}",
+            device_class=SensorDeviceClass.TIMESTAMP,
+            icon="mdi:thermometer-chevron-down",
+        )
+        for target in (200, 100)
+    ),
     SensorEntityDescription(
         key="temperature",
         translation_key="temperature",
@@ -114,6 +123,8 @@ class SuperwiseSensor(SuperwiseEntity, SensorEntity):
         data = self.coordinator.data
         ctrl = data["controller"]
         key = self.entity_description.key
+        if key in ("cooling_200", "cooling_100"):
+            return self.coordinator.cooling.estimates.get(int(key.split("_")[1]))
         if key in ("temperature", "setpoint", "heating_output", "estimated_power"):
             return ctrl.get(
                 {
@@ -178,6 +189,11 @@ class SuperwiseSensor(SuperwiseEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         key = self.entity_description.key
+        if key in ("cooling_200", "cooling_100"):
+            return {
+                **self.coordinator.cooling.details,
+                "target_temperature": int(key.split("_")[1]),
+            }
         if key == "estimated_power":
             return {"estimated": True, "rated_power_kw": self.coordinator.api.power}
         if key == "program_name":

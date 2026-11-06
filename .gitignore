@@ -14,3 +14,6 @@ AGENTS.override.md
 .coverage
 htmlcov/
 dist/
+
+# Local manufacturer reference; do not redistribute in Git or releases
+/an0902.pdf

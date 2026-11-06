@@ -97,6 +97,12 @@
       },
       "error": {
         "name": "Error code"
+      },
+      "cooling_200": {
+        "name": "Estimated 200 °C time"
+      },
+      "cooling_100": {
+        "name": "Estimated 100 °C time"
       }
     },
     "button": {

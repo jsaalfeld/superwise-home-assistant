@@ -6,7 +6,8 @@ import asyncio
 import logging
 import time
 from contextlib import suppress
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from functools import partial
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.event import async_track_time_interval
@@ -14,6 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import AuthenticationError, CommandError, SuperwiseError
 from .const import CONF_CONTROL, CONF_COOKIES, DOMAIN
+from .cooling import CoolingEstimate
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +31,8 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
         )
         self.entry = entry
         self.api = api
+        self.cooling = CoolingEstimate()
+        self._cooling_loaded = False
         self._metadata_at = 0.0
         self._stream_task = None
         self._unsub_tick = None
@@ -69,7 +73,49 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
             state["programs"] = await self.api.programs()
             state["firings"] = await self.api.firings()
             self._metadata_at = time.monotonic()
+        if not self._cooling_loaded:
+            self._cooling_loaded = True
+            await self._load_cooling_history()
+        self.cooling.update(state["controller"], time.time())
         return state
+
+    async def _load_cooling_history(self):
+        """Optionally reuse recorder samples without requiring the recorder."""
+        if "recorder" not in self.hass.config.components:
+            return
+        from homeassistant.components.recorder import get_instance, history
+        from homeassistant.helpers import entity_registry as er
+
+        registry = er.async_get(self.hass)
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{self.entry.unique_id}_temperature"
+        )
+        if not entity_id:
+            return
+        now = datetime.now(UTC)
+        try:
+            states = await get_instance(self.hass).async_add_executor_job(
+                partial(
+                    history.get_significant_states,
+                    self.hass,
+                    now - timedelta(hours=2),
+                    now,
+                    [entity_id],
+                    include_start_time_state=False,
+                    significant_changes_only=False,
+                    no_attributes=True,
+                )
+            )
+            for state in states.get(entity_id, []):
+                try:
+                    self.cooling.add(state.last_updated.timestamp(), float(state.state))
+                except (ValueError, TypeError):
+                    # Brief restart/unavailable markers do not erase valid samples.
+                    # Longer gaps are rejected by CoolingEstimate.add.
+                    continue
+        except Exception:  # Recorder failure must not prevent kiln telemetry.
+            _LOGGER.debug("Cooling history unavailable", exc_info=True)
+            self.cooling.clear()
 
     async def _renew_session(self, generation):
         async with self._login_lock:
@@ -107,6 +153,7 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
             return
         if self.data:
             ctrl = self.data["controller"]
+            self.cooling.update(ctrl, time.time())
             stamp = ctrl.get("lastActive")
             fresh = bool(stamp and 0 <= time.time() - stamp / 1000 < 60)
             if fresh != ctrl.get("fresh"):
@@ -126,6 +173,7 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
                     if incoming.get("lastActive", 0) < existing.get("lastActive", 0):
                         continue
                     if self.data:
+                        self.cooling.update({**existing, **incoming}, time.time())
                         self.async_set_updated_data(
                             {
                                 **self.data,
@@ -169,6 +217,7 @@ class SuperwiseCoordinator(DataUpdateCoordinator):
                 if operation == "history":
                     return await self.api.history(kwargs["firing_id"])
                 state = await self.api.command(operation, **kwargs)
+                self.cooling.update(state["controller"], time.time())
                 self.async_set_updated_data({**self.data, **state})
                 return None
             except AuthenticationError as err:

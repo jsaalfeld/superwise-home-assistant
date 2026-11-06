@@ -97,6 +97,12 @@
       },
       "error": {
         "name": "Fehlercode"
+      },
+      "cooling_200": {
+        "name": "200 °C voraussichtlich"
+      },
+      "cooling_100": {
+        "name": "100 °C voraussichtlich"
       }
     },
     "button": {

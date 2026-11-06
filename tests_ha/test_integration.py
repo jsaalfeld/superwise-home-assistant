@@ -433,3 +433,81 @@ async def test_discovery_rejected_credentials_do_not_create_entry(hass, mock_api
     mock_api.controllers.assert_not_called()
     mock_api.close.assert_awaited_once()
     assert "synthetic" not in repr(result["data_schema"])
+
+
+async def test_cooling_timestamp_entities_follow_coordinator(hass, mock_api):
+    import math
+    from datetime import UTC, datetime
+
+    entry = await setup(hass, mock_api)
+    coordinator = entry.runtime_data
+    now = float(int(time.time()))
+    coordinator.cooling.clear()
+    for minute in range(121):
+        stamp = now - (120 - minute) * 60
+        coordinator.cooling.add(
+            stamp, 15 + 600 * math.exp(-0.15 * (stamp - now) / 3600)
+        )
+    state = deepcopy(coordinator.data)
+    state["controller"].update(
+        lastActive=now * 1000, value=615, processStatus="PS_FINISHED", fresh=True
+    )
+    coordinator.cooling.update(state["controller"], now)
+    coordinator.async_set_updated_data(state)
+    await hass.async_block_till_done()
+    estimates = [
+        s for s in hass.states.async_all() if "target_temperature" in s.attributes
+    ]
+    assert len(estimates) == 2
+    for sensor in estimates:
+        assert sensor.attributes["device_class"] == "timestamp"
+        assert sensor.attributes["estimated"] is True
+        assert datetime.fromisoformat(sensor.state) > datetime.now(UTC)
+    state["controller"]["processStatus"] = "PS_RUNNING"
+    coordinator.cooling.update(state["controller"], now)
+    coordinator.async_set_updated_data(deepcopy(state))
+    await hass.async_block_till_done()
+    for sensor in estimates:
+        assert hass.states.get(sensor.entity_id).state == "unavailable"
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_cooling_history_restores_forecast_after_reload(hass, mock_api):
+    import math
+    from datetime import UTC, datetime
+
+    from homeassistant.core import State
+
+    entry = await setup(hass, mock_api)
+    coordinator = entry.runtime_data
+    coordinator.cooling.clear()
+    now = float(int(time.time()))
+    states = []
+    for minute in range(121):
+        stamp = now - (120 - minute) * 60
+        value = 15 + 600 * math.exp(-0.15 * (stamp - now) / 3600)
+        states.append(
+            State(
+                "sensor.test_kiln_temperature",
+                str(value),
+                last_updated=datetime.fromtimestamp(stamp, UTC),
+            )
+        )
+    states.append(State("sensor.test_kiln_temperature", "unavailable"))
+    hass.config.components.add("recorder")
+    with patch("homeassistant.components.recorder.get_instance") as recorder:
+        recorder.return_value.async_add_executor_job = AsyncMock(
+            return_value={"sensor.test_kiln_temperature": states}
+        )
+        await coordinator._load_cooling_history()
+    assert len(coordinator.cooling.samples) >= 100, coordinator.cooling.samples
+    ctrl = {
+        **coordinator.data["controller"],
+        "lastActive": now * 1000,
+        "value": 615,
+        "processStatus": "PS_FINISHED",
+    }
+    coordinator.cooling.update(ctrl, now)
+    assert set(coordinator.cooling.estimates) == {100, 200}
+    hass.config.components.remove("recorder")
+    await hass.config_entries.async_unload(entry.entry_id)
