@@ -1,6 +1,7 @@
 {
   "domain": "superwise",
   "name": "Superwise",
+  "after_dependencies": ["recorder"],
   "codeowners": ["@jsaalfeld"],
   "config_flow": true,
   "documentation": "https://github.com/jsaalfeld/superwise-home-assistant",
